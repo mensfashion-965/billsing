@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ta">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>பில் ஸ்கேனர்</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--tx:#1b1f24;--mu:#6a737d;--ac:#0f766e;--bt:#fff;--bd:#dde1e6;--ok:#15803d;--er:#b91c1c}
+@media (prefers-color-scheme:dark){:root{--bg:#111418;--card:#1b2026;--tx:#eceff2;--mu:#98a2ad;--ac:#2dd4bf;--bt:#042f2b;--bd:#2d343c;--ok:#4ade80;--er:#f87171}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font-family:system-ui,-apple-system,"Noto Sans Tamil",sans-serif;padding:16px;max-width:520px;margin-inline:auto}
+h1{font-size:20px;margin:4px 0 12px}
+.tabs{display:flex;gap:8px;margin-bottom:14px}
+.tab{flex:1;padding:11px 6px;border:1px solid var(--bd);border-radius:10px;background:var(--card);color:var(--tx);font:inherit;font-size:14px;font-weight:600;margin:0}
+.tab.on{background:var(--ac);color:var(--bt);border-color:var(--ac)}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:14px;padding:14px;margin-bottom:14px}
+label.f{display:block;font-size:13px;color:var(--mu);margin:10px 0 4px}
+input,button{font:inherit}
+input[type=text],input[type=number],input[type=date]{width:100%;padding:10px;border:1px solid var(--bd);border-radius:10px;background:var(--bg);color:var(--tx)}
+button.main{width:100%;padding:12px;border:0;border-radius:10px;background:var(--ac);color:var(--bt);font-weight:600;margin-top:12px}
+button:disabled{opacity:.5}
+.pick{position:relative;display:block;text-align:center;padding:13px;border-radius:10px;background:var(--ac);color:var(--bt);font-weight:600;margin-top:10px;overflow:hidden}
+.pick:first-child{margin-top:0}
+.pick.alt{background:transparent;color:var(--ac);border:1px solid var(--ac)}
+.pick input{position:absolute;inset:0;width:100%;height:100%;opacity:0;font-size:0}
+#pv{max-width:100%;max-height:200px;border-radius:10px;display:none;margin-top:10px}
+.st{font-size:13px;color:var(--mu);margin-top:8px}
+.ok{color:var(--ok)}.er{color:var(--er)}
+#f,#v2{display:none}
+.sum{display:flex;justify-content:space-between;align-items:center;font-weight:700}
+.sum button{width:auto;padding:8px 12px;margin:0;font-size:13px}
+.row{display:flex;gap:12px;padding:12px 0;border-bottom:1px solid var(--bd)}
+.row:last-child{border-bottom:0}
+.row img{width:64px;height:84px;object-fit:cover;border-radius:8px;background:var(--bd);flex:none}
+.row .t{font-weight:700;font-size:15px}
+.row .a{color:var(--ac);font-weight:700}
+.row .m{font-size:12px;color:var(--mu);margin-top:2px;word-break:break-all}
+</style>
+</head>
+<body>
+<h1>🧾 பில் ஸ்கேனர்</h1>
+
+<div class="tabs">
+  <button class="tab on" id="t1">➕ புதிய பில்</button>
+  <button class="tab" id="t2">📋 Manage Tracking Expenses</button>
+</div>
+
+<div id="v1">
+  <div class="card">
+    <label class="pick">📷 கேமராவில் எடுக்க<input id="file" type="file" accept="image/*" capture="environment"></label>
+    <label class="pick alt">🖼️ கேலரியில் இருந்து தேர்வு<input id="gal" type="file" accept="image/*"></label>
+    <img id="pv" alt="bill">
+    <div class="st" id="st">பில்லை தெளிவாக ஃபோட்டோ எடுக்கவும்.</div>
+  </div>
+  <div class="card" id="f">
+    <label class="f">கடை பெயர்</label><input type="text" id="shop">
+    <label class="f">பில் தேதி</label><input type="date" id="date">
+    <label class="f">மொத்த தொகை (Total) ₹</label><input type="number" id="amt" step="0.01">
+    <label class="f">ஃபோட்டோ பெயர்</label><input type="text" id="pname" readonly>
+    <label class="f">அப்லோட் தேதி</label><input type="text" id="upd" readonly>
+    <label class="f">செலவு காரணம்</label><input type="text" id="why" placeholder="எ.கா. டீ, மளிகை, பெட்ரோல்">
+    <button class="main" id="sub">சப்மிட்</button>
+  </div>
+</div>
+
+<div id="v2">
+  <div class="card">
+    <div class="sum"><span id="tot">மொத்தம்: ₹0</span><button class="main" id="ref">🔄 புதுப்பி</button></div>
+    <div class="st" id="lst">ஏற்றுகிறது…</div>
+    <div id="list"></div>
+  </div>
+</div>
+
+<script>
+var $=function(i){return document.getElementById(i)};
+var thumb='';
+
+function getPw(){
+  var p='';
+  try{p=localStorage.getItem('pw')||''}catch(e){}
+  if(!p){p=prompt('பாஸ்வேர்ட் உள்ளிடவும்')||'';try{localStorage.setItem('pw',p)}catch(e){}}
+  return p;
+}
+function shrink(file,max,q){
+  return new Promise(function(res,rej){
+    var img=new Image();
+    img.onload=function(){
+      var r=Math.min(1,max/Math.max(img.width,img.height));
+      var c=document.createElement('canvas');
+      c.width=Math.round(img.width*r);c.height=Math.round(img.height*r);
+      c.getContext('2d').drawImage(img,0,0,c.width,c.height);
+      res(c.toDataURL('image/jpeg',q).split(',')[1]);
+    };
+    img.onerror=function(){rej(new Error('image'))};
+    img.src=URL.createObjectURL(file);
+  });
+}
+async function post(url,body){
+  body=body||{};body.password=getPw();
+  var r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+  if(r.status===401){try{localStorage.removeItem('pw')}catch(e){}throw new Error('பாஸ்வேர்ட் தவறு')}
+  var d=await r.json();
+  if(!r.ok) throw new Error(d.error||'பிழை');
+  return d;
+}
+
+/* tabs */
+function show(n){
+  $('v1').style.display=n===1?'block':'none';
+  $('v2').style.display=n===2?'block':'none';
+  $('t1').className='tab'+(n===1?' on':'');
+  $('t2').className='tab'+(n===2?' on':'');
+  if(n===2) loadList();
+}
+$('t1').onclick=function(){show(1)};
+$('t2').onclick=function(){show(2)};
+$('ref').onclick=loadList;
+
+/* scan */
+$('file').onchange=$('gal').onchange=async function(e){
+  var f=e.target.files[0]; if(!f) return;
+  var st=$('st'); st.className='st';
+  $('pv').src=URL.createObjectURL(f); $('pv').style.display='block';
+  $('f').style.display='none';
+  $('upd').value=new Date().toLocaleString('ta-IN');
+  $('pname').value=f.name||('bill_'+Date.now()+'.jpg');
+  st.textContent='🔍 பில்லை படிக்கிறது…';
+  try{
+    thumb=await shrink(f,200,0.6);
+    var b64=await shrink(f,1600,0.85);
+    var d=await post('/api/scan',{image:b64});
+    $('shop').value=d.shop||'';
+    $('date').value=/^\d{4}-\d{2}-\d{2}$/.test(d.date||'')?d.date:'';
+    $('amt').value=(d.total!=null&&!isNaN(d.total))?Number(d.total).toFixed(2):'';
+    var miss=!d.shop||!d.date||d.total==null;
+    st.className='st '+(miss?'er':'ok');
+    st.textContent=miss?'⚠️ சில மதிப்புகள் படிக்க முடியவில்லை. நிரப்பவும்.':'✅ ஸ்கேன் முடிந்தது. சரிபார்த்து காரணம் எழுதவும்.';
+  }catch(err){
+    st.className='st er';
+    st.textContent='⚠️ '+err.message+'. கையால் நிரப்பவும் அல்லது மீண்டும் முயலவும்.';
+  }
+  $('f').style.display='block';
+  e.target.value='';
+};
+
+/* save */
+$('sub').onclick=async function(){
+  var st=$('st');
+  if(!$('why').value.trim()){st.className='st er';st.textContent='⚠️ காரணம் எழுதவும்.';return}
+  $('sub').disabled=true;
+  try{
+    await post('/api/save',{shop:$('shop').value,date:$('date').value,total:$('amt').value,
+      reason:$('why').value,photo_name:$('pname').value,thumb:thumb});
+    $('f').style.display='none';$('pv').style.display='none';$('why').value='';thumb='';
+    st.className='st ok';st.textContent='✅ சேமிக்கப்பட்டது! "Manage Tracking Expenses"-ல் பார்க்கலாம்.';
+  }catch(err){
+    st.className='st er';st.textContent='⚠️ சேமிக்க முடியவில்லை: '+err.message;
+  }
+  $('sub').disabled=false;
+};
+
+/* manage list */
+function line(cls,txt){var d=document.createElement('div');d.className=cls;d.textContent=txt;return d}
+async function loadList(){
+  var lst=$('lst'),box=$('list');
+  lst.className='st';lst.textContent='ஏற்றுகிறது…';box.textContent='';
+  try{
+    var d=await post('/api/list',{});
+    var rows=d.rows||[],sum=0;
+    rows.forEach(function(x){
+      sum+=Number(x.total)||0;
+      var r=document.createElement('div');r.className='row';
+      var im=document.createElement('img');im.alt='bill';
+      if(x.thumb) im.src='data:image/jpeg;base64,'+x.thumb;
+      var b=document.createElement('div');
+      b.appendChild(line('t',x.shop||'—'));
+      b.appendChild(line('a','₹'+Number(x.total||0).toFixed(2)));
+      b.appendChild(line('m','காரணம்: '+(x.reason||'—')));
+      b.appendChild(line('m','பில் தேதி: '+(x.bill_date||'—')));
+      b.appendChild(line('m','அப்லோட்: '+new Date(x.created_at).toLocaleString('ta-IN')));
+      b.appendChild(line('m','ஃபோட்டோ: '+(x.photo_name||'—')));
+      r.appendChild(im);r.appendChild(b);box.appendChild(r);
+    });
+    $('tot').textContent='மொத்தம்: ₹'+sum.toFixed(2)+' ('+rows.length+')';
+    lst.textContent=rows.length?'':'இன்னும் பில்கள் இல்லை.';
+  }catch(err){
+    lst.className='st er';lst.textContent='⚠️ '+err.message;
+  }
+}
+</script>
+</body>
+</html>
